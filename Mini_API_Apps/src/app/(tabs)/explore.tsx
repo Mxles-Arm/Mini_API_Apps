@@ -16,19 +16,24 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadGenres();
-  }, []);
+    let cancelled = false;
 
-  const loadGenres = async () => {
-    try {
-      const data = await getGenres();
-      setGenres(data);
-    } catch (error) {
-      console.error('Error loading genres:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const loadGenres = async () => {
+      try {
+        const data = await getGenres();
+        if (!cancelled) setGenres(data);
+      } catch (error) {
+        console.error('Error loading genres:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadGenres();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -72,15 +77,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '900',
+    fontSize: 27,
+    fontWeight: '800',
+    letterSpacing: -0.7,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
+    letterSpacing: 0.3,
     paddingHorizontal: 16,
-    marginTop: 4,
+    marginTop: 3,
     marginBottom: 16,
   },
   grid: {

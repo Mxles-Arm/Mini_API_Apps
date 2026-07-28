@@ -1,10 +1,19 @@
 // ==========================================
 // WatchWise — TMDB API Configuration
 // ==========================================
-// Replace 'YOUR_API_KEY_HERE' with your actual TMDB API key
-// Get one free at: https://www.themoviedb.org/settings/api
+// The key is read from .env (git-ignored), never hardcoded here.
+// Copy .env.example to .env and add your own key:
+//   https://www.themoviedb.org/settings/api
 
-export const TMDB_API_KEY = 'YOUR_API_KEY_HERE';
+export const TMDB_API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY ?? '';
+
+if (!TMDB_API_KEY && __DEV__) {
+  console.warn(
+    'TMDB API key missing. Copy .env.example to .env and set ' +
+      'EXPO_PUBLIC_TMDB_API_KEY, then restart the dev server.'
+  );
+}
+
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 

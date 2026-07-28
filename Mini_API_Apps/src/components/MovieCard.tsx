@@ -13,13 +13,18 @@ import RatingBadge from './RatingBadge';
 
 interface MovieCardProps {
   movie: Movie;
+  /** Explicit width. Defaults to 36% of the viewport (carousel sizing). */
+  width?: number;
+  /** Horizontal carousels need trailing space; grids handle their own gaps. */
+  spacing?: boolean;
 }
 
-export default function MovieCard({ movie }: MovieCardProps) {
+export default function MovieCard({ movie, width: widthProp, spacing = true }: MovieCardProps) {
   const router = useRouter();
   const { colors } = useThemeContext();
-  const { width } = useWindowDimensions();
-  const CARD_WIDTH = width * 0.36;
+  const { width: windowWidth } = useWindowDimensions();
+
+  const CARD_WIDTH = widthProp ?? windowWidth * 0.36;
   const CARD_HEIGHT = CARD_WIDTH * 1.5;
 
   const posterUri = movie.poster_path
@@ -30,7 +35,14 @@ export default function MovieCard({ movie }: MovieCardProps) {
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.container, { width: CARD_WIDTH }, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={movie.title}
+      style={({ pressed }) => [
+        styles.container,
+        { width: CARD_WIDTH },
+        spacing && styles.spaced,
+        pressed && styles.pressed,
+      ]}
       onPress={() => router.push(`/movie/${movie.id}`)}
     >
       <View style={[styles.imageContainer, { width: CARD_WIDTH, height: CARD_HEIGHT, backgroundColor: colors.surfaceLight }]}>
@@ -55,6 +67,9 @@ export default function MovieCard({ movie }: MovieCardProps) {
 
 const styles = StyleSheet.create({
   container: {
+    marginBottom: 4,
+  },
+  spaced: {
     marginRight: 12,
   },
   pressed: {

@@ -42,30 +42,40 @@ export default function MovieDetailScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadMovieData();
-  }, [id]);
+    let cancelled = false;
 
-  const loadMovieData = async () => {
-    const movieId = parseInt(id);
-    if (isNaN(movieId)) return;
-    try {
-      setLoading(true);
-      const [movieData, creditsData, similarData, isFav] = await Promise.all([
-        getMovieDetails(movieId),
-        getMovieCredits(movieId),
-        getSimilarMovies(movieId),
-        isFavorite(movieId),
-      ]);
-      setMovie(movieData);
-      setCast(creditsData.slice(0, 15));
-      setSimilar(similarData.results);
-      setFavorite(isFav);
-    } catch (error) {
-      console.error('Error loading movie details:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const loadMovieData = async () => {
+      const movieId = parseInt(id);
+      if (isNaN(movieId)) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const [movieData, creditsData, similarData, isFav] = await Promise.all([
+          getMovieDetails(movieId),
+          getMovieCredits(movieId),
+          getSimilarMovies(movieId),
+          isFavorite(movieId),
+        ]);
+        if (cancelled) return;
+
+        setMovie(movieData);
+        setCast(creditsData.slice(0, 15));
+        setSimilar(similarData.results);
+        setFavorite(isFav);
+      } catch (error) {
+        console.error('Error loading movie details:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadMovieData();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const handleToggleFavorite = async () => {
     if (!movie) return;
@@ -109,6 +119,9 @@ export default function MovieDetailScreen() {
           <Pressable
             style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
             onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={8}
           >
             <Ionicons name="arrow-back" size={22} color="#FFF" />
           </Pressable>
@@ -143,11 +156,20 @@ export default function MovieDetailScreen() {
 
         {/* Favorite Button */}
         <Pressable
-          style={[
+          style={({ pressed }) => [
             styles.favoriteButton,
-            { backgroundColor: favorite ? colors.accent : colors.surface, borderColor: colors.border },
+            {
+              backgroundColor: favorite ? colors.accent : colors.surface,
+              borderColor: favorite ? colors.accent : colors.border,
+              opacity: pressed ? 0.85 : 1,
+            },
           ]}
           onPress={handleToggleFavorite}
+          accessibilityRole="button"
+          accessibilityState={{ selected: favorite }}
+          accessibilityLabel={
+            favorite ? `Remove ${movie.title} from favorites` : `Add ${movie.title} to favorites`
+          }
         >
           <Ionicons
             name={favorite ? 'heart' : 'heart-outline'}
@@ -155,7 +177,7 @@ export default function MovieDetailScreen() {
             color={favorite ? '#FFF' : colors.accent}
           />
           <Text style={[styles.favoriteText, { color: favorite ? '#FFF' : colors.text }]}>
-            {favorite ? 'Added to Favorites' : 'Add to Favorites'}
+            {favorite ? 'In your favorites' : 'Add to favorites'}
           </Text>
         </Pressable>
 

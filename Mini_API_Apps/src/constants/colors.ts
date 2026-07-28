@@ -1,76 +1,83 @@
 // ==========================================
 // WatchWise — Color System
 // ==========================================
-// Cinematic dark theme with warm gold accent
-// Designed for movie browsing — immersive & elegant
+// Grounded in the projection booth, not the corporate lobby.
+// Neutrals carry a violet bias — the color of a dark room lit
+// only by a screen. The accent is projector-lamp amber: warm,
+// desaturated, reads as light rather than as metal.
 
 export const Colors = {
   dark: {
-    background: '#0D1B2A',
-    surface: '#1B2838',
-    surfaceLight: '#243447',
-    card: '#162233',
-    primary: '#E2B616',
-    primaryDim: '#C49B0E',
-    accent: '#E50914',
-    text: '#FFFFFF',
-    textSecondary: '#8899AA',
-    textMuted: '#556677',
-    border: '#2A3A4A',
-    tabBar: '#0A1520',
-    tabBarActive: '#E2B616',
-    tabBarInactive: '#556677',
+    background: '#12101A',
+    surface: '#1C1926',
+    surfaceLight: '#272233',
+    card: '#191622',
+    primary: '#F0A868',
+    primaryDim: '#C9854B',
+    accent: '#E4572E',
+    text: '#F5F1EC',
+    textSecondary: '#9B93A8',
+    textMuted: '#655D73',
+    border: '#2C2738',
+    tabBar: '#0D0B14',
+    tabBarActive: '#F0A868',
+    tabBarInactive: '#655D73',
     statusBar: 'light',
-    gradient: ['rgba(13, 27, 42, 0)', 'rgba(13, 27, 42, 0.8)', '#0D1B2A'],
+    gradient: ['rgba(18, 16, 26, 0)', 'rgba(18, 16, 26, 0.8)', '#12101A'],
   },
   light: {
-    background: '#F5F7FA',
+    background: '#F7F4F0',
     surface: '#FFFFFF',
-    surfaceLight: '#EEF1F5',
+    surfaceLight: '#EFEAE4',
     card: '#FFFFFF',
-    primary: '#C49B0E',
-    primaryDim: '#A88200',
-    accent: '#E50914',
-    text: '#0D1B2A',
-    textSecondary: '#5A6A7A',
-    textMuted: '#8899AA',
-    border: '#DEE3EA',
+    primary: '#B96A28',
+    primaryDim: '#96521B',
+    accent: '#C6431F',
+    text: '#1A1622',
+    textSecondary: '#5F5769',
+    textMuted: '#8E8697',
+    border: '#E2DBD3',
     tabBar: '#FFFFFF',
-    tabBarActive: '#C49B0E',
-    tabBarInactive: '#8899AA',
+    tabBarActive: '#B96A28',
+    tabBarInactive: '#8E8697',
     statusBar: 'dark',
-    gradient: ['rgba(245, 247, 250, 0)', 'rgba(245, 247, 250, 0.8)', '#F5F7FA'],
+    gradient: ['rgba(247, 244, 240, 0)', 'rgba(247, 244, 240, 0.8)', '#F7F4F0'],
   },
 };
 
-// Rating badge colors
+// Rating badge colors — desaturated so they read as film stock,
+// not as a status dashboard. Still three clearly separable steps.
 export const RatingColors = {
-  high: '#2ECC71',    // 7.0+
-  medium: '#F1C40F',  // 5.0 - 6.9
-  low: '#E74C3C',     // below 5.0
+  high: '#5FB58A',    // 7.0+
+  medium: '#D9A441',  // 5.0 - 6.9
+  low: '#C1614F',     // below 5.0
 };
 
 // Genre card colors
+// One family, not a rainbow: every swatch sits in a narrow
+// band of saturation and lightness so the grid reads as a set.
+// Hue does the sorting — warm for spectacle, cool for interior,
+// earth for period. Bright pop is reserved for Sci-Fi alone.
 export const GenreColors: Record<number, string> = {
-  28: '#E74C3C',    // Action
-  12: '#E67E22',    // Adventure
-  16: '#3498DB',    // Animation
-  35: '#F1C40F',    // Comedy
-  80: '#2C3E50',    // Crime
-  99: '#1ABC9C',    // Documentary
-  18: '#8E44AD',    // Drama
-  10751: '#E91E63', // Family
-  14: '#9B59B6',    // Fantasy
-  36: '#795548',    // History
-  27: '#C0392B',    // Horror
-  10402: '#00BCD4', // Music
-  9648: '#607D8B',  // Mystery
-  10749: '#FF4081', // Romance
-  878: '#00E5FF',   // Science Fiction
-  10770: '#FF9800', // TV Movie
-  53: '#37474F',    // Thriller
-  10752: '#4CAF50', // War
-  37: '#8D6E63',    // Western
+  28: '#B4483A',    // Action
+  12: '#C2703A',    // Adventure
+  16: '#4A7FA5',    // Animation
+  35: '#D19A3E',    // Comedy
+  80: '#3A3F52',    // Crime
+  99: '#4F8C7C',    // Documentary
+  18: '#7A5A87',    // Drama
+  10751: '#C4707E', // Family
+  14: '#6B5C99',    // Fantasy
+  36: '#8A6E52',    // History
+  27: '#8C3230',    // Horror
+  10402: '#417F8C', // Music
+  9648: '#5A6472',  // Mystery
+  10749: '#C06B7D', // Romance
+  878: '#3E8FA8',   // Science Fiction
+  10770: '#B58248', // TV Movie
+  53: '#454B5C',    // Thriller
+  10752: '#5F7355', // War
+  37: '#96745A',    // Western
 };
 
 // Genre icons (Ionicons names)

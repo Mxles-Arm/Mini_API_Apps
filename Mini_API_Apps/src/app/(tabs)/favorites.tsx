@@ -1,42 +1,36 @@
 // ==========================================
 // WatchWise — Favorites Screen
 // ==========================================
-// Saved movies with swipe-to-remove
+// Saved movies, reloaded whenever the tab regains focus.
 
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Movie } from '@/services/tmdb';
 import { getFavorites, removeFavorite } from '@/services/favorites';
-import { IMAGE_SIZES } from '@/constants/config';
-import RatingBadge from '@/components/RatingBadge';
+import MovieRow from '@/components/MovieRow';
 
 export default function FavoritesScreen() {
   const { colors } = useThemeContext();
-  const router = useRouter();
   const [favorites, setFavorites] = useState<Movie[]>([]);
 
-  // Reload favorites when screen is focused
+  const loadFavorites = useCallback(async () => {
+    const data = await getFavorites();
+    setFavorites(data);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadFavorites();
-    }, [])
+    }, [loadFavorites])
   );
 
-  const loadFavorites = async () => {
-    const data = await getFavorites();
-    setFavorites(data);
-  };
-
-  const handleRemove = (movie: Movie) => {
-    Alert.alert(
-      'Remove Favorite',
-      `Remove "${movie.title}" from your favorites?`,
-      [
+  const handleRemove = useCallback(
+    (movie: Movie) => {
+      Alert.alert('Remove from favorites?', movie.title, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
@@ -46,74 +40,55 @@ export default function FavoritesScreen() {
             loadFavorites();
           },
         },
-      ]
-    );
-  };
-
-  const renderItem = ({ item }: { item: Movie }) => {
-    const posterUri = item.poster_path
-      ? `${IMAGE_SIZES.poster.small}${item.poster_path}`
-      : null;
-    const year = item.release_date ? item.release_date.split('-')[0] : '';
-
-    return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.card,
-          { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 },
-        ]}
-        onPress={() => router.push(`/movie/${item.id}`)}
-      >
-        <View style={[styles.posterContainer, { backgroundColor: colors.surfaceLight }]}>
-          {posterUri ? (
-            <Image source={{ uri: posterUri }} style={styles.poster} contentFit="cover" transition={300} />
-          ) : (
-            <View style={styles.noPoster}>
-              <Ionicons name="film-outline" size={24} color={colors.textMuted} />
-            </View>
-          )}
-        </View>
-        <View style={styles.info}>
-          <Text style={[styles.movieTitle, { color: colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={[styles.year, { color: colors.textSecondary }]}>{year}</Text>
-          <RatingBadge rating={item.vote_average} size="small" />
-        </View>
-        <Pressable onPress={() => handleRemove(item)} style={styles.removeButton}>
-          <Ionicons name="trash-outline" size={20} color={colors.accent} />
-        </Pressable>
-      </Pressable>
-    );
-  };
+      ]);
+    },
+    [loadFavorites]
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <Text style={[styles.title, { color: colors.text }]}>My Favorites</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Favorites</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {favorites.length} {favorites.length === 1 ? 'movie' : 'movies'} saved
+          {favorites.length === 0
+            ? 'Nothing saved yet'
+            : `${favorites.length} ${favorites.length === 1 ? 'movie' : 'movies'} saved`}
         </Text>
 
-        {favorites.length > 0 ? (
-          <FlatList
-            data={favorites}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="heart-outline" size={70} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
-              No favorites yet
-            </Text>
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Tap the heart icon on any movie to save it here
-            </Text>
-          </View>
-        )}
+        <FlatList
+          data={favorites}
+          renderItem={({ item }) => (
+            <MovieRow
+              movie={item}
+              inlineRating
+              trailing={
+                <Pressable
+                  onPress={() => handleRemove(item)}
+                  style={styles.removeButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${item.title} from favorites`}
+                  hitSlop={6}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.accent} />
+                </Pressable>
+              }
+            />
+          )}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={favorites.length === 0 ? styles.emptyList : styles.list}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="heart-outline" size={64} color={colors.textMuted} />
+              <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
+                Your list is empty
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                Open any movie and tap Add to favorites to keep it here.
+              </Text>
+            </View>
+          }
+        />
       </SafeAreaView>
     </View>
   );
@@ -127,55 +102,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '900',
+    fontSize: 27,
+    fontWeight: '800',
+    letterSpacing: -0.7,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
+    letterSpacing: 0.3,
     paddingHorizontal: 16,
-    marginTop: 4,
+    marginTop: 3,
     marginBottom: 16,
   },
   list: {
     paddingHorizontal: 16,
     paddingBottom: 30,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 10,
-    gap: 12,
-  },
-  posterContainer: {
-    width: 65,
-    height: 95,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  noPoster: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  info: {
-    flex: 1,
-    gap: 4,
-  },
-  movieTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  year: {
-    fontSize: 12,
-    marginBottom: 4,
+  emptyList: {
+    flexGrow: 1,
   },
   removeButton: {
     padding: 8,
@@ -186,10 +131,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 40,
+    paddingBottom: 60,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   emptyText: {
     fontSize: 13,

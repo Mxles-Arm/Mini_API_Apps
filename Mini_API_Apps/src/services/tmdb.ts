@@ -2,10 +2,10 @@
 // WatchWise — TMDB API Service
 // ==========================================
 
-import axios from 'axios';
+import { create } from 'axios';
 import { TMDB_API_KEY, TMDB_BASE_URL } from '@/constants/config';
 
-const api = axios.create({
+const api = create({
   baseURL: TMDB_BASE_URL,
   params: {
     api_key: TMDB_API_KEY,

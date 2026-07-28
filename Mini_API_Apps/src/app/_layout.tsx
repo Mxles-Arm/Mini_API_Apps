@@ -2,12 +2,19 @@
 // WatchWise — Root Layout (Stack Navigator)
 // ==========================================
 
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useThemeContext } from '@/context/ThemeContext';
 
 function RootStack() {
-  const { colors, isDark } = useThemeContext();
+  const { colors, isDark, ready } = useThemeContext();
+
+  // Hold the first frame until the saved theme is known, otherwise
+  // the app paints one theme and immediately repaints in the other.
+  if (!ready) {
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  }
 
   return (
     <>

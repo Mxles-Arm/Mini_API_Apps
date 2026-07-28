@@ -25,33 +25,40 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [trendingRes, nowPlayingRes, topRatedRes, upcomingRes, popularRes] =
+          await Promise.all([
+            getTrending(),
+            getNowPlaying(),
+            getTopRated(),
+            getUpcoming(),
+            getPopular(),
+          ]);
+        if (cancelled) return;
+
+        setTrending(trendingRes.results);
+        setSections([
+          { title: 'Now Playing', data: nowPlayingRes.results },
+          { title: 'Top Rated', data: topRatedRes.results },
+          { title: 'Upcoming', data: upcomingRes.results },
+          { title: 'Popular', data: popularRes.results },
+        ]);
+      } catch (error) {
+        console.error('Error loading home data:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
     loadData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [trendingRes, nowPlayingRes, topRatedRes, upcomingRes, popularRes] = await Promise.all([
-        getTrending(),
-        getNowPlaying(),
-        getTopRated(),
-        getUpcoming(),
-        getPopular(),
-      ]);
-
-      setTrending(trendingRes.results);
-      setSections([
-        { title: 'Now Playing', data: nowPlayingRes.results },
-        { title: 'Top Rated', data: topRatedRes.results },
-        { title: 'Upcoming', data: upcomingRes.results },
-        { title: 'Popular', data: popularRes.results },
-      ]);
-    } catch (error) {
-      console.error('Error loading home data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -68,9 +75,14 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={[styles.appName, { color: colors.primary }]}>WatchWise</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>What to watch tonight?</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{'Tonight’s shortlist'}</Text>
           </View>
-          <Pressable onPress={toggleTheme} style={styles.themeButton}>
+          <Pressable
+            onPress={toggleTheme}
+            style={styles.themeButton}
+            accessibilityRole="button"
+            accessibilityLabel={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
             <Ionicons name={isDark ? 'sunny' : 'moon'} size={22} color={colors.text} />
           </Pressable>
         </View>
@@ -119,24 +131,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   appName: {
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: 27,
+    fontWeight: '800',
+    letterSpacing: -0.7,
   },
   subtitle: {
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 12,
+    marginTop: 3,
+    letterSpacing: 0.3,
   },
   themeButton: {
     padding: 8,
     borderRadius: 20,
   },
   section: {
-    marginTop: 24,
+    marginTop: 26,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
+    letterSpacing: -0.2,
     paddingHorizontal: 16,
     marginBottom: 12,
   },

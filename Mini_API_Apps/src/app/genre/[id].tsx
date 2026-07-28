@@ -1,101 +1,99 @@
 // ==========================================
 // WatchWise — Genre Movies Screen
 // ==========================================
-// Movies filtered by genre
+// Paginated grid of movies in one genre.
 
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Pressable, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Movie, getMoviesByGenre } from '@/services/tmdb';
-import { IMAGE_SIZES } from '@/constants/config';
-import RatingBadge from '@/components/RatingBadge';
+import MovieCard from '@/components/MovieCard';
+
+const GRID_PADDING = 16;
+const GRID_GAP = 12;
 
 export default function GenreMoviesScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
-  const router = useRouter();
   const { colors } = useThemeContext();
   const { width } = useWindowDimensions();
-  const CARD_WIDTH = (width - 48) / 2;
+
+  const cardWidth = (width - GRID_PADDING * 2 - GRID_GAP) / 2;
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    setPage(1);
+    let cancelled = false;
+
+    const loadMovies = async () => {
+      const genreId = parseInt(id);
+      if (isNaN(genreId)) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const data = await getMoviesByGenre(genreId, 1);
+        if (cancelled) return;
+        setMovies(data.results);
+        setTotalPages(data.total_pages);
+        setPage(1);
+      } catch (error) {
+        console.error('Error loading genre movies:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
     loadMovies();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-  const loadMovies = async () => {
-    const genreId = parseInt(id);
-    if (isNaN(genreId)) return;
-    try {
-      setLoading(true);
-      const data = await getMoviesByGenre(genreId, 1);
-      setMovies(data.results);
-    } catch (error) {
-      console.error('Error loading genre movies:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading || page >= totalPages) return;
 
-  const loadMore = async () => {
-    if (loadingMore) return;
     const genreId = parseInt(id);
     if (isNaN(genreId)) return;
+
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
       const data = await getMoviesByGenre(genreId, nextPage);
-      setMovies((prev) => [...prev, ...data.results]);
+      setMovies((prev) => {
+        // TMDB can repeat titles across pages; keep the list unique.
+        const seen = new Set(prev.map((m) => m.id));
+        return [...prev, ...data.results.filter((m) => !seen.has(m.id))];
+      });
       setPage(nextPage);
     } catch (error) {
       console.error('Error loading more:', error);
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [id, page, totalPages, loading, loadingMore]);
 
-  const renderMovie = ({ item }: { item: Movie }) => {
-    const posterUri = item.poster_path
-      ? `${IMAGE_SIZES.poster.medium}${item.poster_path}`
-      : null;
-    const year = item.release_date ? item.release_date.split('-')[0] : '';
-
-    return (
-      <Pressable
-        style={({ pressed }) => [styles.card, { width: CARD_WIDTH }, pressed && { opacity: 0.8 }]}
-        onPress={() => router.push(`/movie/${item.id}`)}
-      >
-        <View style={[styles.posterContainer, { height: CARD_WIDTH * 1.5, backgroundColor: colors.surfaceLight }]}>
-          {posterUri ? (
-            <Image source={{ uri: posterUri }} style={styles.poster} contentFit="cover" transition={300} />
-          ) : (
-            <View style={styles.noPoster}>
-              <Ionicons name="film-outline" size={30} color={colors.textMuted} />
-            </View>
-          )}
-          <View style={styles.ratingContainer}>
-            <RatingBadge rating={item.vote_average} size="small" />
-          </View>
-        </View>
-        <Text style={[styles.movieTitle, { color: colors.text }]} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={[styles.year, { color: colors.textSecondary }]}>{year}</Text>
-      </Pressable>
-    );
+  const screenOptions = {
+    title: name || 'Genre',
+    headerStyle: { backgroundColor: colors.surface },
+    headerTintColor: colors.text,
   };
 
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <Stack.Screen options={{ title: name || 'Genre' }} />
+        <Stack.Screen options={screenOptions} />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -103,18 +101,13 @@ export default function GenreMoviesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          title: name || 'Genre',
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.text,
-        }}
-      />
+      <Stack.Screen options={screenOptions} />
       <FlatList
         data={movies}
-        renderItem={renderMovie}
+        renderItem={({ item }) => <MovieCard movie={item} width={cardWidth} spacing={false} />}
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
+        columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
@@ -139,39 +132,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   grid: {
-    padding: 16,
+    padding: GRID_PADDING,
+    paddingBottom: 30,
   },
-  card: {
-    marginBottom: 16,
-    marginHorizontal: 4,
-  },
-  posterContainer: {
-    width: '100%',
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  noPoster: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ratingContainer: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  movieTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  year: {
-    fontSize: 11,
-    marginTop: 2,
+  row: {
+    gap: GRID_GAP,
+    marginBottom: GRID_GAP,
   },
   footer: {
     paddingVertical: 20,

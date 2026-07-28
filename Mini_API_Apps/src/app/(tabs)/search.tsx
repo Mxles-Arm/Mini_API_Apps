@@ -1,31 +1,35 @@
 // ==========================================
 // WatchWise — Search Screen
 // ==========================================
-// Search bar with debounce + result cards
+// Debounced title search. Results render as MovieRow.
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Movie, searchMovies } from '@/services/tmdb';
-import { IMAGE_SIZES } from '@/constants/config';
-import RatingBadge from '@/components/RatingBadge';
+import MovieRow from '@/components/MovieRow';
+
+const MIN_QUERY_LENGTH = 2;
+const DEBOUNCE_MS = 500;
 
 export default function SearchScreen() {
   const { colors } = useThemeContext();
-  const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  const debounceRef = React.useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  // Guards against a slow earlier request overwriting a newer one.
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
@@ -34,60 +38,54 @@ export default function SearchScreen() {
     setQuery(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    if (text.trim().length < 2) {
+    const trimmed = text.trim();
+    if (trimmed.length < MIN_QUERY_LENGTH) {
       setResults([]);
       setSearched(false);
+      setLoading(false);
       return;
     }
 
+    setLoading(true);
     debounceRef.current = setTimeout(async () => {
+      const requestId = ++requestIdRef.current;
       try {
-        setLoading(true);
-        const data = await searchMovies(text.trim());
+        const data = await searchMovies(trimmed);
+        if (!mountedRef.current || requestId !== requestIdRef.current) return;
         setResults(data.results);
         setSearched(true);
       } catch (error) {
         console.error('Search error:', error);
+        if (mountedRef.current && requestId === requestIdRef.current) {
+          setResults([]);
+          setSearched(true);
+        }
       } finally {
-        setLoading(false);
+        if (mountedRef.current && requestId === requestIdRef.current) {
+          setLoading(false);
+        }
       }
-    }, 500);
+    }, DEBOUNCE_MS);
   }, []);
 
-  const renderMovieItem = ({ item }: { item: Movie }) => {
-    const posterUri = item.poster_path
-      ? `${IMAGE_SIZES.poster.small}${item.poster_path}`
-      : null;
-    const year = item.release_date ? item.release_date.split('-')[0] : '';
-
+  const renderEmpty = () => {
+    if (loading) return null;
     return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.resultCard,
-          { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 },
-        ]}
-        onPress={() => router.push(`/movie/${item.id}`)}
-      >
-        <View style={[styles.posterContainer, { backgroundColor: colors.surfaceLight }]}>
-          {posterUri ? (
-            <Image source={{ uri: posterUri }} style={styles.poster} contentFit="cover" transition={300} />
-          ) : (
-            <View style={styles.noPoster}>
-              <Ionicons name="film-outline" size={24} color={colors.textMuted} />
-            </View>
-          )}
-        </View>
-        <View style={styles.resultInfo}>
-          <Text style={[styles.resultTitle, { color: colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={[styles.resultYear, { color: colors.textSecondary }]}>{year}</Text>
-          <Text style={[styles.resultOverview, { color: colors.textMuted }]} numberOfLines={2}>
-            {item.overview}
-          </Text>
-        </View>
-        <RatingBadge rating={item.vote_average} size="small" />
-      </Pressable>
+      <View style={styles.centerContent}>
+        <Ionicons
+          name={searched ? 'film-outline' : 'search-outline'}
+          size={56}
+          color={colors.textMuted}
+        />
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          {searched ? `Nothing matches “${query.trim()}”` : 'Search by title'}
+        </Text>
+        <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
+          {searched
+            ? 'Check the spelling, or try part of the title.'
+            : `Type at least ${MIN_QUERY_LENGTH} letters to start.`}
+        </Text>
+      </View>
     );
   };
 
@@ -96,8 +94,9 @@ export default function SearchScreen() {
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <Text style={[styles.title, { color: colors.text }]}>Search</Text>
 
-        {/* Search Bar */}
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View
+          style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
           <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
             style={[styles.input, { color: colors.text }]}
@@ -107,43 +106,37 @@ export default function SearchScreen() {
             onChangeText={handleSearch}
             autoCapitalize="none"
             autoCorrect={false}
+            returnKeyType="search"
+            accessibilityLabel="Search movies by title"
           />
           {query.length > 0 && (
-            <Pressable onPress={() => handleSearch('')}>
+            <Pressable
+              onPress={() => handleSearch('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              hitSlop={8}
+            >
               <Ionicons name="close-circle" size={18} color={colors.textMuted} />
             </Pressable>
           )}
         </View>
 
-        {/* Results */}
         {loading ? (
           <View style={styles.centerContent}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
-        ) : results.length > 0 ? (
+        ) : (
           <FlatList
             data={results}
-            renderItem={renderMovieItem}
+            renderItem={({ item }) => <MovieRow movie={item} showOverview />}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.resultList}
+            contentContainerStyle={
+              results.length === 0 ? styles.emptyList : styles.resultList
+            }
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={renderEmpty}
           />
-        ) : (
-          <View style={styles.centerContent}>
-            {searched ? (
-              <>
-                <Ionicons name="sad-outline" size={60} color={colors.textMuted} />
-                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No movies found</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="search-outline" size={60} color={colors.textMuted} />
-                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-                  Find your next movie
-                </Text>
-              </>
-            )}
-          </View>
         )}
       </SafeAreaView>
     </View>
@@ -158,8 +151,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '900',
+    fontSize: 27,
+    fontWeight: '800',
+    letterSpacing: -0.7,
     paddingHorizontal: 16,
     paddingTop: 12,
     marginBottom: 12,
@@ -185,51 +179,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+    paddingBottom: 60,
   },
   emptyText: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    paddingHorizontal: 48,
+    marginTop: -4,
   },
   resultList: {
     paddingHorizontal: 16,
     paddingBottom: 30,
   },
-  resultCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 10,
-    gap: 12,
-  },
-  posterContainer: {
-    width: 65,
-    height: 95,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  noPoster: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  resultInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  resultTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  resultYear: {
-    fontSize: 12,
-  },
-  resultOverview: {
-    fontSize: 11,
-    lineHeight: 15,
+  emptyList: {
+    flexGrow: 1,
   },
 });
