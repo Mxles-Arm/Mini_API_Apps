@@ -3,19 +3,19 @@
 // ==========================================
 // Paginated grid of movies in one genre.
 
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  useWindowDimensions,
-} from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import ErrorState from '@/components/ErrorState';
+import MovieCard from '@/components/MovieCard';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Movie, getMoviesByGenre } from '@/services/tmdb';
-import MovieCard from '@/components/MovieCard';
-import ErrorState from '@/components/ErrorState';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
 const GRID_PADDING = 16;
 const GRID_GAP = 12;

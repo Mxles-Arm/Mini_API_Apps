@@ -3,40 +3,40 @@
 // ==========================================
 // Backdrop, info, overview, cast, similar movies, favorite button
 
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  FlatList,
-  ActivityIndicator,
-  useWindowDimensions,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as WebBrowser from 'expo-web-browser';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import CastCard from '@/components/CastCard';
+import ErrorState from '@/components/ErrorState';
+import MovieCard from '@/components/MovieCard';
+import RatingBadge from '@/components/RatingBadge';
+import { IMAGE_SIZES } from '@/constants/config';
 import { useThemeContext } from '@/context/ThemeContext';
+import { isFavorite, toggleFavorite } from '@/services/favorites';
 import {
-  Movie,
   CastMember,
+  Movie,
   Video,
-  getMovieDetails,
   getMovieCredits,
-  getSimilarMovies,
+  getMovieDetails,
   getMovieVideos,
+  getSimilarMovies,
   pickTrailer,
 } from '@/services/tmdb';
-import { toggleFavorite, isFavorite } from '@/services/favorites';
-import { IMAGE_SIZES } from '@/constants/config';
-import RatingBadge from '@/components/RatingBadge';
-import CastCard from '@/components/CastCard';
-import MovieCard from '@/components/MovieCard';
-import ErrorState from '@/components/ErrorState';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const BACKDROP_HEIGHT = 300;
 

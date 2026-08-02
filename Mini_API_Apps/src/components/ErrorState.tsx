@@ -5,10 +5,9 @@
 // error is never silent — the interface says what happened and
 // gives a way to retry, in place of an endless spinner.
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '@/context/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface ErrorStateProps {
   message?: string;
