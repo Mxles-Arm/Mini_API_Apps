@@ -1,16 +1,11 @@
-// ==========================================
-// WatchWise — Search Screen
-// ==========================================
-// Debounced title search. Results render as MovieRow.
-
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import ErrorState from '@/components/ErrorState';
+import MovieRow from '@/components/MovieRow';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Movie, searchMovies } from '@/services/tmdb';
-import MovieRow from '@/components/MovieRow';
-import ErrorState from '@/components/ErrorState';
+import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 500;
@@ -20,19 +15,13 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   // Guards against a slow earlier request overwriting a newer one.
   const requestIdRef = useRef(0);
-  // The query each page result belongs to, so a stale loadMore can't
-  // append page-2 results from a search the user has already replaced.
-  const activeQueryRef = useRef('');
 
   useEffect(() => {
     mountedRef.current = true;
@@ -45,15 +34,12 @@ export default function SearchScreen() {
   const runSearch = useCallback((trimmed: string) => {
     setLoading(true);
     setError(false);
-    activeQueryRef.current = trimmed;
     debounceRef.current = setTimeout(async () => {
       const requestId = ++requestIdRef.current;
       try {
-        const data = await searchMovies(trimmed, 1);
+        const data = await searchMovies(trimmed);
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
         setResults(data.results);
-        setPage(1);
-        setTotalPages(data.total_pages);
         setSearched(true);
       } catch (err) {
         console.error('Search error:', err);
@@ -75,13 +61,10 @@ export default function SearchScreen() {
 
       const trimmed = text.trim();
       if (trimmed.length < MIN_QUERY_LENGTH) {
-        activeQueryRef.current = '';
         setResults([]);
         setSearched(false);
         setLoading(false);
         setError(false);
-        setPage(1);
-        setTotalPages(1);
         return;
       }
 
@@ -94,30 +77,6 @@ export default function SearchScreen() {
     const trimmed = query.trim();
     if (trimmed.length >= MIN_QUERY_LENGTH) runSearch(trimmed);
   }, [query, runSearch]);
-
-  const loadMore = useCallback(async () => {
-    if (loadingMore || loading || error || page >= totalPages) return;
-    const trimmed = activeQueryRef.current;
-    if (!trimmed) return;
-
-    try {
-      setLoadingMore(true);
-      const nextPage = page + 1;
-      const data = await searchMovies(trimmed, nextPage);
-      // The query may have changed while this request was in flight.
-      if (!mountedRef.current || activeQueryRef.current !== trimmed) return;
-
-      setResults((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        return [...prev, ...data.results.filter((m) => !seen.has(m.id))];
-      });
-      setPage(nextPage);
-    } catch (err) {
-      console.error('Error loading more search results:', err);
-    } finally {
-      if (mountedRef.current) setLoadingMore(false);
-    }
-  }, [loadingMore, loading, error, page, totalPages]);
 
   const renderEmpty = () => {
     if (loading) return null;
@@ -189,13 +148,6 @@ export default function SearchScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={renderEmpty}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              loadingMore ? (
-                <ActivityIndicator style={styles.footer} color={colors.primary} />
-              ) : null
-            }
           />
         )}
       </SafeAreaView>
@@ -261,8 +213,5 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flexGrow: 1,
-  },
-  footer: {
-    paddingVertical: 20,
   },
 });
