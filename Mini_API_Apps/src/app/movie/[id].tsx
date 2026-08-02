@@ -16,11 +16,21 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeContext } from '@/context/ThemeContext';
-import { Movie, CastMember, getMovieDetails, getMovieCredits, getSimilarMovies } from '@/services/tmdb';
+import {
+  Movie,
+  CastMember,
+  Video,
+  getMovieDetails,
+  getMovieCredits,
+  getSimilarMovies,
+  getMovieVideos,
+  pickTrailer,
+} from '@/services/tmdb';
 import { toggleFavorite, isFavorite } from '@/services/favorites';
 import { IMAGE_SIZES } from '@/constants/config';
 import RatingBadge from '@/components/RatingBadge';
@@ -38,8 +48,10 @@ export default function MovieDetailScreen() {
   const [movie, setMovie] = useState<Movie | null>(null);
   const [cast, setCast] = useState<CastMember[]>([]);
   const [similar, setSimilar] = useState<Movie[]>([]);
+  const [trailer, setTrailer] = useState<Video | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [openingTrailer, setOpeningTrailer] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,11 +64,12 @@ export default function MovieDetailScreen() {
       }
       try {
         setLoading(true);
-        const [movieData, creditsData, similarData, isFav] = await Promise.all([
+        const [movieData, creditsData, similarData, isFav, videos] = await Promise.all([
           getMovieDetails(movieId),
           getMovieCredits(movieId),
           getSimilarMovies(movieId),
           isFavorite(movieId),
+          getMovieVideos(movieId).catch(() => []),
         ]);
         if (cancelled) return;
 
@@ -64,6 +77,7 @@ export default function MovieDetailScreen() {
         setCast(creditsData.slice(0, 15));
         setSimilar(similarData.results);
         setFavorite(isFav);
+        setTrailer(pickTrailer(videos));
       } catch (error) {
         console.error('Error loading movie details:', error);
       } finally {
@@ -81,6 +95,16 @@ export default function MovieDetailScreen() {
     if (!movie) return;
     const result = await toggleFavorite(movie);
     setFavorite(result);
+  };
+
+  const handleWatchTrailer = async () => {
+    if (!trailer || openingTrailer) return;
+    try {
+      setOpeningTrailer(true);
+      await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${trailer.key}`);
+    } finally {
+      setOpeningTrailer(false);
+    }
   };
 
   if (loading || !movie) {
@@ -154,32 +178,50 @@ export default function MovieDetailScreen() {
           </View>
         </View>
 
-        {/* Favorite Button */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.favoriteButton,
-            {
-              backgroundColor: favorite ? colors.accent : colors.surface,
-              borderColor: favorite ? colors.accent : colors.border,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-          onPress={handleToggleFavorite}
-          accessibilityRole="button"
-          accessibilityState={{ selected: favorite }}
-          accessibilityLabel={
-            favorite ? `Remove ${movie.title} from favorites` : `Add ${movie.title} to favorites`
-          }
-        >
-          <Ionicons
-            name={favorite ? 'heart' : 'heart-outline'}
-            size={20}
-            color={favorite ? '#FFF' : colors.accent}
-          />
-          <Text style={[styles.favoriteText, { color: favorite ? '#FFF' : colors.text }]}>
-            {favorite ? 'In your favorites' : 'Add to favorites'}
-          </Text>
-        </Pressable>
+        {/* Actions */}
+        <View style={styles.actionRow}>
+          {trailer && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.trailerButton,
+                { backgroundColor: colors.primary, opacity: pressed || openingTrailer ? 0.85 : 1 },
+              ]}
+              onPress={handleWatchTrailer}
+              disabled={openingTrailer}
+              accessibilityRole="button"
+              accessibilityLabel={`Watch trailer for ${movie.title}`}
+            >
+              <Ionicons name="play" size={18} color={colors.background} />
+              <Text style={[styles.trailerText, { color: colors.background }]}>Trailer</Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.favoriteButton,
+              {
+                backgroundColor: favorite ? colors.accent : colors.surface,
+                borderColor: favorite ? colors.accent : colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            onPress={handleToggleFavorite}
+            accessibilityRole="button"
+            accessibilityState={{ selected: favorite }}
+            accessibilityLabel={
+              favorite ? `Remove ${movie.title} from favorites` : `Add ${movie.title} to favorites`
+            }
+          >
+            <Ionicons
+              name={favorite ? 'heart' : 'heart-outline'}
+              size={20}
+              color={favorite ? '#FFF' : colors.accent}
+            />
+            <Text style={[styles.favoriteText, { color: favorite ? '#FFF' : colors.text }]}>
+              {favorite ? 'In your favorites' : 'Add to favorites'}
+            </Text>
+          </Pressable>
+        </View>
 
         {/* Overview */}
         {movie.overview ? (
@@ -309,14 +351,31 @@ const styles = StyleSheet.create({
   voteCount: {
     fontSize: 12,
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  trailerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+  },
+  trailerText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
   favoriteButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
     borderRadius: 12,
-    marginTop: 20,
     borderWidth: 1,
   },
   favoriteText: {

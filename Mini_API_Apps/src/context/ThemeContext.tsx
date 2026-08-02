@@ -58,14 +58,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const mode: ThemeMode = override ?? (systemScheme === 'light' ? 'light' : 'dark');
 
+  // Derived above, so the toggle can compute the next mode without
+  // writing to storage from inside a state updater (updaters must
+  // stay pure — React may invoke them more than once).
   const toggleTheme = useCallback(() => {
-    setOverride((prev) => {
-      const current = prev ?? (systemScheme === 'light' ? 'light' : 'dark');
-      const next: ThemeMode = current === 'dark' ? 'light' : 'dark';
-      saveTheme(next);
-      return next;
-    });
-  }, [systemScheme]);
+    const next: ThemeMode = mode === 'dark' ? 'light' : 'dark';
+    setOverride(next);
+    saveTheme(next);
+  }, [mode]);
 
   const value = useMemo<ThemeContextType>(
     () => ({
