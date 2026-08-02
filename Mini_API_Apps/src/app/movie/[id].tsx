@@ -3,7 +3,7 @@
 // ==========================================
 // Backdrop, info, overview, cast, similar movies, favorite button
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ import { IMAGE_SIZES } from '@/constants/config';
 import RatingBadge from '@/components/RatingBadge';
 import CastCard from '@/components/CastCard';
 import MovieCard from '@/components/MovieCard';
+import ErrorState from '@/components/ErrorState';
 
 const BACKDROP_HEIGHT = 300;
 
@@ -51,7 +52,11 @@ export default function MovieDetailScreen() {
   const [trailer, setTrailer] = useState<Video | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [openingTrailer, setOpeningTrailer] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +69,7 @@ export default function MovieDetailScreen() {
       }
       try {
         setLoading(true);
+        setError(false);
         const [movieData, creditsData, similarData, isFav, videos] = await Promise.all([
           getMovieDetails(movieId),
           getMovieCredits(movieId),
@@ -78,8 +84,9 @@ export default function MovieDetailScreen() {
         setSimilar(similarData.results);
         setFavorite(isFav);
         setTrailer(pickTrailer(videos));
-      } catch (error) {
-        console.error('Error loading movie details:', error);
+      } catch (err) {
+        console.error('Error loading movie details:', err);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -89,7 +96,7 @@ export default function MovieDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const handleToggleFavorite = async () => {
     if (!movie) return;
@@ -107,10 +114,18 @@ export default function MovieDetailScreen() {
     }
   };
 
-  if (loading || !movie) {
+  if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error || !movie) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ErrorState onRetry={retry} />
       </View>
     );
   }

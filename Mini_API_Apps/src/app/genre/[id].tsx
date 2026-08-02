@@ -15,6 +15,7 @@ import { useLocalSearchParams, Stack } from 'expo-router';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Movie, getMoviesByGenre } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import ErrorState from '@/components/ErrorState';
 
 const GRID_PADDING = 16;
 const GRID_GAP = 12;
@@ -28,9 +29,13 @@ export default function GenreMoviesScreen() {
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,13 +48,15 @@ export default function GenreMoviesScreen() {
       }
       try {
         setLoading(true);
+        setError(false);
         const data = await getMoviesByGenre(genreId, 1);
         if (cancelled) return;
         setMovies(data.results);
         setTotalPages(data.total_pages);
         setPage(1);
-      } catch (error) {
-        console.error('Error loading genre movies:', error);
+      } catch (err) {
+        console.error('Error loading genre movies:', err);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -59,7 +66,7 @@ export default function GenreMoviesScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || loading || page >= totalPages) return;
@@ -95,6 +102,15 @@ export default function GenreMoviesScreen() {
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <Stack.Screen options={screenOptions} />
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={screenOptions} />
+        <ErrorState onRetry={retry} />
       </View>
     );
   }

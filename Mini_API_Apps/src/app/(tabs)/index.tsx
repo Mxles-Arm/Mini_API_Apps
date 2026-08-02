@@ -3,8 +3,17 @@
 // ==========================================
 // Trending banner, Now Playing, Top Rated, Upcoming, Popular
 
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -12,6 +21,7 @@ import { Movie, getTrending, getNowPlaying, getTopRated, getUpcoming, getPopular
 import MovieCard from '@/components/MovieCard';
 import Banner from '@/components/Banner';
 import RandomPickButton from '@/components/RandomPickButton';
+import ErrorState from '@/components/ErrorState';
 
 interface MovieSection {
   title: string;
@@ -23,13 +33,34 @@ export default function HomeScreen() {
   const [trending, setTrending] = useState<Movie[]>([]);
   const [sections, setSections] = useState<MovieSection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  // Distinguishes a pull-to-refresh (keep content, show inline spinner)
+  // from the initial/retry load (show the full-screen spinner).
+  const isRefreshRef = useRef(false);
+
+  const retry = useCallback(() => {
+    isRefreshRef.current = false;
+    setReloadKey((k) => k + 1);
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    isRefreshRef.current = true;
+    setReloadKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadData = async () => {
-      try {
+      if (isRefreshRef.current) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
+      }
+      setError(false);
+      try {
         const [trendingRes, nowPlayingRes, topRatedRes, upcomingRes, popularRes] =
           await Promise.all([
             getTrending(),
@@ -47,10 +78,14 @@ export default function HomeScreen() {
           { title: 'Upcoming', data: upcomingRes.results },
           { title: 'Popular', data: popularRes.results },
         ]);
-      } catch (error) {
-        console.error('Error loading home data:', error);
+      } catch (err) {
+        console.error('Error loading home data:', err);
+        if (!cancelled) setError(true);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     };
 
@@ -58,7 +93,7 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   if (loading) {
     return (
@@ -68,8 +103,26 @@ export default function HomeScreen() {
     );
   }
 
+  if (error) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ErrorState onRetry={retry} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[colors.primary]}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <SafeAreaView edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
@@ -82,6 +135,7 @@ export default function HomeScreen() {
             style={styles.themeButton}
             accessibilityRole="button"
             accessibilityLabel={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+            hitSlop={8}
           >
             <Ionicons name={isDark ? 'sunny' : 'moon'} size={22} color={colors.text} />
           </Pressable>

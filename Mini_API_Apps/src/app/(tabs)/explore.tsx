@@ -1,29 +1,32 @@
-// ==========================================
-// WatchWise — Explore Screen
-// ==========================================
-// Genre grid with color-coded cards
-
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import ErrorState from '@/components/ErrorState';
+import GenreCard from '@/components/GenreCard';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Genre, getGenres } from '@/services/tmdb';
-import GenreCard from '@/components/GenreCard';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ExploreScreen() {
   const { colors } = useThemeContext();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadGenres = async () => {
       try {
+        setLoading(true);
+        setError(false);
         const data = await getGenres();
         if (!cancelled) setGenres(data);
-      } catch (error) {
-        console.error('Error loading genres:', error);
+      } catch (err) {
+        console.error('Error loading genres:', err);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -33,12 +36,20 @@ export default function ExploreScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ErrorState onRetry={retry} />
       </View>
     );
   }

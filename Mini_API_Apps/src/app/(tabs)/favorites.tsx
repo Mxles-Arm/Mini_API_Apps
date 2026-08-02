@@ -1,17 +1,12 @@
-// ==========================================
-// WatchWise — Favorites Screen
-// ==========================================
-// Saved movies, reloaded whenever the tab regains focus.
-
-import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import MovieRow from '@/components/MovieRow';
+import { useThemeContext } from '@/context/ThemeContext';
+import { getFavorites, removeFavorite } from '@/services/favorites';
+import { Movie } from '@/services/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { useThemeContext } from '@/context/ThemeContext';
-import { Movie } from '@/services/tmdb';
-import { getFavorites, removeFavorite } from '@/services/favorites';
-import MovieRow from '@/components/MovieRow';
+import { useCallback, useState } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function FavoritesScreen() {
   const { colors } = useThemeContext();
@@ -67,7 +62,7 @@ export default function FavoritesScreen() {
                   style={styles.removeButton}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${item.title} from favorites`}
-                  hitSlop={6}
+                  hitSlop={10}
                 >
                   <Ionicons name="trash-outline" size={20} color={colors.accent} />
                 </Pressable>
