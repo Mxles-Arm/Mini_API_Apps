@@ -20,6 +20,8 @@ export default function GenreCard({ genre }: GenreCardProps) {
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Browse ${genre.name} movies`}
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: bgColor, opacity: pressed ? 0.8 : 1 },

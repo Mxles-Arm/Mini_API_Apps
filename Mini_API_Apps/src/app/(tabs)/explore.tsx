@@ -1,39 +1,55 @@
-// ==========================================
-// WatchWise — Explore Screen
-// ==========================================
-// Genre grid with color-coded cards
-
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import ErrorState from '@/components/ErrorState';
+import GenreCard from '@/components/GenreCard';
 import { useThemeContext } from '@/context/ThemeContext';
 import { Genre, getGenres } from '@/services/tmdb';
-import GenreCard from '@/components/GenreCard';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ExploreScreen() {
   const { colors } = useThemeContext();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
-    loadGenres();
-  }, []);
+    let cancelled = false;
 
-  const loadGenres = async () => {
-    try {
-      const data = await getGenres();
-      setGenres(data);
-    } catch (error) {
-      console.error('Error loading genres:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const loadGenres = async () => {
+      try {
+        setLoading(true);
+        setError(false);
+        const data = await getGenres();
+        if (!cancelled) setGenres(data);
+      } catch (err) {
+        console.error('Error loading genres:', err);
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadGenres();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ErrorState onRetry={retry} />
       </View>
     );
   }
@@ -72,15 +88,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '900',
+    fontSize: 27,
+    fontWeight: '800',
+    letterSpacing: -0.7,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
+    letterSpacing: 0.3,
     paddingHorizontal: 16,
-    marginTop: 4,
+    marginTop: 3,
     marginBottom: 16,
   },
   grid: {

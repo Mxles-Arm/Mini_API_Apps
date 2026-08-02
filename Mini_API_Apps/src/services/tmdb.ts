@@ -2,10 +2,10 @@
 // WatchWise — TMDB API Service
 // ==========================================
 
-import axios from 'axios';
+import { create } from 'axios';
 import { TMDB_API_KEY, TMDB_BASE_URL } from '@/constants/config';
 
-const api = axios.create({
+const api = create({
   baseURL: TMDB_BASE_URL,
   params: {
     api_key: TMDB_API_KEY,
@@ -40,6 +40,15 @@ export interface CastMember {
   name: string;
   character: string;
   profile_path: string | null;
+}
+
+export interface Video {
+  id: string;
+  key: string;
+  name: string;
+  site: string;
+  type: string;
+  official: boolean;
 }
 
 export interface MovieResponse {
@@ -112,6 +121,23 @@ export const getMovieCredits = async (movieId: number): Promise<CastMember[]> =>
 export const getSimilarMovies = async (movieId: number): Promise<MovieResponse> => {
   const response = await api.get(`/movie/${movieId}/similar`);
   return response.data;
+};
+
+export const getMovieVideos = async (movieId: number): Promise<Video[]> => {
+  const response = await api.get(`/movie/${movieId}/videos`);
+  return response.data.results;
+};
+
+/** The best trailer to lead with: prefer an official YouTube trailer, then teaser, then anything on YouTube. */
+export const pickTrailer = (videos: Video[]): Video | null => {
+  const onYouTube = videos.filter((v) => v.site === 'YouTube');
+  return (
+    onYouTube.find((v) => v.type === 'Trailer' && v.official) ??
+    onYouTube.find((v) => v.type === 'Trailer') ??
+    onYouTube.find((v) => v.type === 'Teaser') ??
+    onYouTube[0] ??
+    null
+  );
 };
 
 // ---------- Random Pick ----------

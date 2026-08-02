@@ -3,29 +3,40 @@
 // ==========================================
 // Backdrop, info, overview, cast, similar movies, favorite button
 
-import React, { useEffect, useState } from 'react';
+import CastCard from '@/components/CastCard';
+import ErrorState from '@/components/ErrorState';
+import MovieCard from '@/components/MovieCard';
+import RatingBadge from '@/components/RatingBadge';
+import { IMAGE_SIZES } from '@/constants/config';
+import { useThemeContext } from '@/context/ThemeContext';
+import { isFavorite, toggleFavorite } from '@/services/favorites';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  FlatList,
-  ActivityIndicator,
-  useWindowDimensions,
-} from 'react-native';
+  CastMember,
+  Movie,
+  Video,
+  getMovieCredits,
+  getMovieDetails,
+  getMovieVideos,
+  getSimilarMovies,
+  pickTrailer,
+} from '@/services/tmdb';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useThemeContext } from '@/context/ThemeContext';
-import { Movie, CastMember, getMovieDetails, getMovieCredits, getSimilarMovies } from '@/services/tmdb';
-import { toggleFavorite, isFavorite } from '@/services/favorites';
-import { IMAGE_SIZES } from '@/constants/config';
-import RatingBadge from '@/components/RatingBadge';
-import CastCard from '@/components/CastCard';
-import MovieCard from '@/components/MovieCard';
 
 const BACKDROP_HEIGHT = 300;
 
@@ -38,34 +49,54 @@ export default function MovieDetailScreen() {
   const [movie, setMovie] = useState<Movie | null>(null);
   const [cast, setCast] = useState<CastMember[]>([]);
   const [similar, setSimilar] = useState<Movie[]>([]);
+  const [trailer, setTrailer] = useState<Video | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [openingTrailer, setOpeningTrailer] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
-    loadMovieData();
-  }, [id]);
+    let cancelled = false;
 
-  const loadMovieData = async () => {
-    const movieId = parseInt(id);
-    if (isNaN(movieId)) return;
-    try {
-      setLoading(true);
-      const [movieData, creditsData, similarData, isFav] = await Promise.all([
-        getMovieDetails(movieId),
-        getMovieCredits(movieId),
-        getSimilarMovies(movieId),
-        isFavorite(movieId),
-      ]);
-      setMovie(movieData);
-      setCast(creditsData.slice(0, 15));
-      setSimilar(similarData.results);
-      setFavorite(isFav);
-    } catch (error) {
-      console.error('Error loading movie details:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const loadMovieData = async () => {
+      const movieId = parseInt(id);
+      if (isNaN(movieId)) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        setError(false);
+        const [movieData, creditsData, similarData, isFav, videos] = await Promise.all([
+          getMovieDetails(movieId),
+          getMovieCredits(movieId),
+          getSimilarMovies(movieId),
+          isFavorite(movieId),
+          getMovieVideos(movieId).catch(() => []),
+        ]);
+        if (cancelled) return;
+
+        setMovie(movieData);
+        setCast(creditsData.slice(0, 15));
+        setSimilar(similarData.results);
+        setFavorite(isFav);
+        setTrailer(pickTrailer(videos));
+      } catch (err) {
+        console.error('Error loading movie details:', err);
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadMovieData();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, reloadKey]);
 
   const handleToggleFavorite = async () => {
     if (!movie) return;
@@ -73,10 +104,28 @@ export default function MovieDetailScreen() {
     setFavorite(result);
   };
 
-  if (loading || !movie) {
+  const handleWatchTrailer = async () => {
+    if (!trailer || openingTrailer) return;
+    try {
+      setOpeningTrailer(true);
+      await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${trailer.key}`);
+    } finally {
+      setOpeningTrailer(false);
+    }
+  };
+
+  if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error || !movie) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ErrorState onRetry={retry} />
       </View>
     );
   }
@@ -109,6 +158,9 @@ export default function MovieDetailScreen() {
           <Pressable
             style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
             onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={8}
           >
             <Ionicons name="arrow-back" size={22} color="#FFF" />
           </Pressable>
@@ -141,23 +193,50 @@ export default function MovieDetailScreen() {
           </View>
         </View>
 
-        {/* Favorite Button */}
-        <Pressable
-          style={[
-            styles.favoriteButton,
-            { backgroundColor: favorite ? colors.accent : colors.surface, borderColor: colors.border },
-          ]}
-          onPress={handleToggleFavorite}
-        >
-          <Ionicons
-            name={favorite ? 'heart' : 'heart-outline'}
-            size={20}
-            color={favorite ? '#FFF' : colors.accent}
-          />
-          <Text style={[styles.favoriteText, { color: favorite ? '#FFF' : colors.text }]}>
-            {favorite ? 'Added to Favorites' : 'Add to Favorites'}
-          </Text>
-        </Pressable>
+        {/* Actions */}
+        <View style={styles.actionRow}>
+          {trailer && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.trailerButton,
+                { backgroundColor: colors.primary, opacity: pressed || openingTrailer ? 0.85 : 1 },
+              ]}
+              onPress={handleWatchTrailer}
+              disabled={openingTrailer}
+              accessibilityRole="button"
+              accessibilityLabel={`Watch trailer for ${movie.title}`}
+            >
+              <Ionicons name="play" size={18} color={colors.background} />
+              <Text style={[styles.trailerText, { color: colors.background }]}>Trailer</Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.favoriteButton,
+              {
+                backgroundColor: favorite ? colors.accent : colors.surface,
+                borderColor: favorite ? colors.accent : colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            onPress={handleToggleFavorite}
+            accessibilityRole="button"
+            accessibilityState={{ selected: favorite }}
+            accessibilityLabel={
+              favorite ? `Remove ${movie.title} from favorites` : `Add ${movie.title} to favorites`
+            }
+          >
+            <Ionicons
+              name={favorite ? 'heart' : 'heart-outline'}
+              size={20}
+              color={favorite ? '#FFF' : colors.accent}
+            />
+            <Text style={[styles.favoriteText, { color: favorite ? '#FFF' : colors.text }]}>
+              {favorite ? 'In your favorites' : 'Add to favorites'}
+            </Text>
+          </Pressable>
+        </View>
 
         {/* Overview */}
         {movie.overview ? (
@@ -287,14 +366,31 @@ const styles = StyleSheet.create({
   voteCount: {
     fontSize: 12,
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  trailerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+  },
+  trailerText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
   favoriteButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
     borderRadius: 12,
-    marginTop: 20,
     borderWidth: 1,
   },
   favoriteText: {

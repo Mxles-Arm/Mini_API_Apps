@@ -27,17 +27,19 @@ export default function Banner({ movies }: BannerProps) {
   const { colors } = useThemeContext();
   const { width } = useWindowDimensions();
 
+  const slides = useMemo(() => movies.slice(0, 5), [movies]);
+
   useEffect(() => {
-    if (movies.length === 0) return;
+    if (slides.length <= 1) return;
     const interval = setInterval(() => {
       setActiveIndex((prev) => {
-        const next = (prev + 1) % movies.length;
+        const next = (prev + 1) % slides.length;
         flatListRef.current?.scrollToIndex({ index: next, animated: true });
         return next;
       });
     }, 4000);
     return () => clearInterval(interval);
-  }, [movies.length]);
+  }, [slides.length]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
@@ -49,6 +51,11 @@ export default function Banner({ movies }: BannerProps) {
     flatListRef.current?.scrollToOffset({ offset: info.index * width, animated: true });
   }, [width]);
 
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => ({ length: width, offset: width * index, index }),
+    [width]
+  );
+
   const slideStyle = useMemo(() => [styles.slide, { width }], [width]);
 
   const renderItem = ({ item }: { item: Movie }) => {
@@ -58,6 +65,8 @@ export default function Banner({ movies }: BannerProps) {
 
     return (
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
         style={slideStyle}
         onPress={() => router.push(`/movie/${item.id}`)}
       >
@@ -87,7 +96,7 @@ export default function Banner({ movies }: BannerProps) {
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={movies.slice(0, 5)}
+        data={slides}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         horizontal
@@ -96,10 +105,11 @@ export default function Banner({ movies }: BannerProps) {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onScrollToIndexFailed={onScrollToIndexFailed}
+        getItemLayout={getItemLayout}
       />
       {/* Dot indicators */}
       <View style={styles.dots}>
-        {movies.slice(0, 5).map((_, index) => (
+        {slides.map((_, index) => (
           <View
             key={index}
             style={[
