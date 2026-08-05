@@ -1,6 +1,12 @@
 import ErrorState from '@/components/ErrorState';
 import MovieRow from '@/components/MovieRow';
 import { useThemeContext } from '@/context/ThemeContext';
+import {
+  addSearchHistoryTerm,
+  clearSearchHistory,
+  getSearchHistory,
+  removeSearchHistoryTerm,
+} from '@/services/preferences';
 import { Movie, searchMovies } from '@/services/tmdb';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,6 +23,7 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
@@ -25,6 +32,7 @@ export default function SearchScreen() {
 
   useEffect(() => {
     mountedRef.current = true;
+    getSearchHistory().then((h) => mountedRef.current && setHistory(h));
     return () => {
       mountedRef.current = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -41,6 +49,10 @@ export default function SearchScreen() {
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
         setResults(data.results);
         setSearched(true);
+        // Only remember searches that actually found something.
+        if (data.results.length > 0) {
+          addSearchHistoryTerm(trimmed).then((h) => mountedRef.current && setHistory(h));
+        }
       } catch (err) {
         console.error('Search error:', err);
         if (mountedRef.current && requestId === requestIdRef.current) {
@@ -73,13 +85,33 @@ export default function SearchScreen() {
     [runSearch]
   );
 
+  const handleSelectHistoryTerm = useCallback(
+    (term: string) => {
+      setQuery(term);
+      runSearch(term);
+    },
+    [runSearch]
+  );
+
+  const handleRemoveHistoryTerm = useCallback((term: string) => {
+    removeSearchHistoryTerm(term).then((h) => mountedRef.current && setHistory(h));
+  }, []);
+
+  const handleClearHistory = useCallback(() => {
+    clearSearchHistory();
+    setHistory([]);
+  }, []);
+
   const retry = useCallback(() => {
     const trimmed = query.trim();
     if (trimmed.length >= MIN_QUERY_LENGTH) runSearch(trimmed);
   }, [query, runSearch]);
 
+  const showingHistory = query.trim().length < MIN_QUERY_LENGTH && history.length > 0;
+
   const renderEmpty = () => {
     if (loading) return null;
+    if (showingHistory) return null;
     return (
       <View style={styles.centerContent}>
         <Ionicons
@@ -131,7 +163,49 @@ export default function SearchScreen() {
           )}
         </View>
 
-        {loading ? (
+        {showingHistory ? (
+          <View style={styles.historySection}>
+            <View style={styles.historyHeader}>
+              <Text style={[styles.historyTitle, { color: colors.textSecondary }]}>Recent searches</Text>
+              <Pressable
+                onPress={handleClearHistory}
+                accessibilityRole="button"
+                accessibilityLabel="Clear all recent searches"
+                hitSlop={8}
+              >
+                <Text style={[styles.historyClear, { color: colors.primary }]}>Clear</Text>
+              </Pressable>
+            </View>
+            <View style={styles.historyChips}>
+              {history.map((term) => (
+                <View
+                  key={term}
+                  style={[styles.historyChip, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <Pressable
+                    onPress={() => handleSelectHistoryTerm(term)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Search again for ${term}`}
+                    style={styles.historyChipLabel}
+                  >
+                    <Ionicons name="time-outline" size={13} color={colors.textMuted} />
+                    <Text style={[styles.historyChipText, { color: colors.text }]} numberOfLines={1}>
+                      {term}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleRemoveHistoryTerm(term)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${term} from recent searches`}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={13} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : loading ? (
           <View style={styles.centerContent}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
@@ -213,5 +287,50 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flexGrow: 1,
+  },
+  historySection: {
+    paddingHorizontal: 16,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  historyTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  historyClear: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  historyChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  historyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 12,
+    paddingRight: 10,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    maxWidth: '100%',
+  },
+  historyChipLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    maxWidth: 180,
+  },
+  historyChipText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

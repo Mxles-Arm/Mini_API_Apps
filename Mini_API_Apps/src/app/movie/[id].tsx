@@ -1,15 +1,17 @@
 // ==========================================
 // WatchWise — Movie Detail Screen
 // ==========================================
-// Backdrop, info, overview, cast, similar movies, favorite button
+// Backdrop, info, overview, cast, recommendations, favorite button.
 
 import CastCard from '@/components/CastCard';
 import ErrorState from '@/components/ErrorState';
 import MovieCard from '@/components/MovieCard';
 import RatingBadge from '@/components/RatingBadge';
+import WatchProviders from '@/components/WatchProviders';
 import { IMAGE_SIZES } from '@/constants/config';
 import { useThemeContext } from '@/context/ThemeContext';
 import { isFavorite, toggleFavorite } from '@/services/favorites';
+import { successFeedback, tapFeedback } from '@/services/haptics';
 import {
   CastMember,
   Movie,
@@ -17,7 +19,7 @@ import {
   getMovieCredits,
   getMovieDetails,
   getMovieVideos,
-  getSimilarMovies,
+  getRecommendedMovies,
   pickTrailer,
 } from '@/services/tmdb';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +33,7 @@ import {
   FlatList,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -48,7 +51,7 @@ export default function MovieDetailScreen() {
 
   const [movie, setMovie] = useState<Movie | null>(null);
   const [cast, setCast] = useState<CastMember[]>([]);
-  const [similar, setSimilar] = useState<Movie[]>([]);
+  const [recommended, setRecommended] = useState<Movie[]>([]);
   const [trailer, setTrailer] = useState<Video | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -70,10 +73,10 @@ export default function MovieDetailScreen() {
       try {
         setLoading(true);
         setError(false);
-        const [movieData, creditsData, similarData, isFav, videos] = await Promise.all([
+        const [movieData, creditsData, recommendedData, isFav, videos] = await Promise.all([
           getMovieDetails(movieId),
           getMovieCredits(movieId),
-          getSimilarMovies(movieId),
+          getRecommendedMovies(movieId),
           isFavorite(movieId),
           getMovieVideos(movieId).catch(() => []),
         ]);
@@ -81,7 +84,7 @@ export default function MovieDetailScreen() {
 
         setMovie(movieData);
         setCast(creditsData.slice(0, 15));
-        setSimilar(similarData.results);
+        setRecommended(recommendedData.results);
         setFavorite(isFav);
         setTrailer(pickTrailer(videos));
       } catch (err) {
@@ -102,10 +105,16 @@ export default function MovieDetailScreen() {
     if (!movie) return;
     const result = await toggleFavorite(movie);
     setFavorite(result);
+    if (result) {
+      successFeedback();
+    } else {
+      tapFeedback();
+    }
   };
 
   const handleWatchTrailer = async () => {
     if (!trailer || openingTrailer) return;
+    tapFeedback();
     try {
       setOpeningTrailer(true);
       await WebBrowser.openBrowserAsync(`https://www.youtube.com/watch?v=${trailer.key}`);
@@ -113,6 +122,18 @@ export default function MovieDetailScreen() {
       setOpeningTrailer(false);
     }
   };
+
+  const handleShare = useCallback(async () => {
+    if (!movie) return;
+    tapFeedback();
+    try {
+      await Share.share({
+        message: `${movie.title} — https://www.themoviedb.org/movie/${movie.id}`,
+      });
+    } catch (err) {
+      console.error('Error sharing movie:', err);
+    }
+  }, [movie]);
 
   if (loading) {
     return (
@@ -153,16 +174,25 @@ export default function MovieDetailScreen() {
           colors={['transparent', colors.background]}
           style={styles.backdropGradient}
         />
-        {/* Back button */}
-        <SafeAreaView edges={['top']} style={styles.backButtonContainer}>
+        {/* Back + share buttons */}
+        <SafeAreaView edges={['top']} style={styles.topBarContainer}>
           <Pressable
-            style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+            style={[styles.iconButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="Go back"
             hitSlop={8}
           >
             <Ionicons name="arrow-back" size={22} color="#FFF" />
+          </Pressable>
+          <Pressable
+            style={[styles.iconButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+            onPress={handleShare}
+            accessibilityRole="button"
+            accessibilityLabel={`Share ${movie.title}`}
+            hitSlop={8}
+          >
+            <Ionicons name="share-outline" size={20} color="#FFF" />
           </Pressable>
         </SafeAreaView>
       </View>
@@ -260,12 +290,15 @@ export default function MovieDetailScreen() {
           </View>
         )}
 
-        {/* Similar Movies */}
-        {similar.length > 0 && (
+        {/* Where to Watch */}
+        <WatchProviders movieId={movie.id} />
+
+        {/* Recommendations */}
+        {recommended.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>You Might Also Like</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recommended</Text>
             <FlatList
-              data={similar}
+              data={recommended}
               renderItem={({ item }) => <MovieCard movie={item} />}
               keyExtractor={(item) => item.id.toString()}
               horizontal
@@ -303,12 +336,15 @@ const styles = StyleSheet.create({
     right: 0,
     height: BACKDROP_HEIGHT * 0.6,
   },
-  backButtonContainer: {
+  topBarContainer: {
     position: 'absolute',
     top: 0,
     left: 16,
+    right: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  backButton: {
+  iconButton: {
     width: 38,
     height: 38,
     borderRadius: 19,

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Mini_API_Apps",
+    "name": "WatchWise",
     "slug": "Mini_API_Apps",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "miniapiapps",
+    "scheme": "watchwise",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Mini_API_Apps"
+      "package": "com.mxlesarm.watchwise"
     },
     "web": {
       "output": "static",
@@ -29,7 +29,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#12101A",
+          "dark": {
+            "backgroundColor": "#12101A"
+          },
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }

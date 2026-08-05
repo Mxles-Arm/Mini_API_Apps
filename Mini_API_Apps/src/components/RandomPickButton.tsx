@@ -10,6 +10,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getRandomMovie } from '@/services/tmdb';
+import { tapFeedback } from '@/services/haptics';
 import { useThemeContext } from '@/context/ThemeContext';
 
 export default function RandomPickButton() {
@@ -18,6 +19,7 @@ export default function RandomPickButton() {
   const { colors } = useThemeContext();
 
   const handlePress = async () => {
+    tapFeedback();
     try {
       setLoading(true);
       const movie = await getRandomMovie();

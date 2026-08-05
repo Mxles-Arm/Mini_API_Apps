@@ -42,6 +42,32 @@ export interface CastMember {
   profile_path: string | null;
 }
 
+export interface Person {
+  id: number;
+  name: string;
+  biography: string;
+  profile_path: string | null;
+  birthday: string | null;
+  deathday: string | null;
+  place_of_birth: string | null;
+  known_for_department: string;
+}
+
+export interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+}
+
+export interface WatchProviderRegion {
+  link: string;
+  flatrate?: WatchProvider[];
+  rent?: WatchProvider[];
+  buy?: WatchProvider[];
+}
+
+export type SortOption = 'popularity.desc' | 'vote_average.desc' | 'release_date.desc' | 'revenue.desc';
+
 export interface Video {
   id: string;
   key: string;
@@ -92,9 +118,25 @@ export const getGenres = async (): Promise<Genre[]> => {
   return response.data.genres;
 };
 
-export const getMoviesByGenre = async (genreId: number, page = 1): Promise<MovieResponse> => {
+/**
+ * Sorting by rating alone surfaces movies with a single 10/10 vote.
+ * A minimum vote count keeps "Top Rated" meaningful for every sort
+ * except the popularity default, where it isn't needed.
+ */
+const MIN_VOTES_FOR_RATING_SORT = 200;
+
+export const getMoviesByGenre = async (
+  genreId: number,
+  page = 1,
+  sortBy: SortOption = 'popularity.desc'
+): Promise<MovieResponse> => {
   const response = await api.get('/discover/movie', {
-    params: { with_genres: genreId, page, sort_by: 'popularity.desc' },
+    params: {
+      with_genres: genreId,
+      page,
+      sort_by: sortBy,
+      ...(sortBy === 'vote_average.desc' ? { 'vote_count.gte': MIN_VOTES_FOR_RATING_SORT } : {}),
+    },
   });
   return response.data;
 };
@@ -118,14 +160,28 @@ export const getMovieCredits = async (movieId: number): Promise<CastMember[]> =>
   return response.data.cast;
 };
 
-export const getSimilarMovies = async (movieId: number): Promise<MovieResponse> => {
-  const response = await api.get(`/movie/${movieId}/similar`);
+export const getRecommendedMovies = async (movieId: number): Promise<MovieResponse> => {
+  const response = await api.get(`/movie/${movieId}/recommendations`);
   return response.data;
 };
 
 export const getMovieVideos = async (movieId: number): Promise<Video[]> => {
   const response = await api.get(`/movie/${movieId}/videos`);
   return response.data.results;
+};
+
+/**
+ * Streaming/rent/buy availability by country. TMDB returns every
+ * region it has data for; callers pick one with `region`. Powered
+ * by JustWatch — the UI must credit them per TMDB's terms.
+ */
+export const getWatchProviders = async (
+  movieId: number,
+  region: string
+): Promise<WatchProviderRegion | null> => {
+  const response = await api.get(`/movie/${movieId}/watch/providers`);
+  const byRegion = response.data.results as Record<string, WatchProviderRegion>;
+  return byRegion[region] ?? null;
 };
 
 /** The best trailer to lead with: prefer an official YouTube trailer, then teaser, then anything on YouTube. */
@@ -138,6 +194,19 @@ export const pickTrailer = (videos: Video[]): Video | null => {
     onYouTube[0] ??
     null
   );
+};
+
+// ---------- Person APIs ----------
+
+export const getPersonDetails = async (personId: number): Promise<Person> => {
+  const response = await api.get(`/person/${personId}`);
+  return response.data;
+};
+
+export const getPersonMovieCredits = async (personId: number): Promise<Movie[]> => {
+  const response = await api.get(`/person/${personId}/movie_credits`);
+  const cast: Movie[] = response.data.cast ?? [];
+  return [...cast].sort((a, b) => b.popularity - a.popularity);
 };
 
 // ---------- Random Pick ----------
