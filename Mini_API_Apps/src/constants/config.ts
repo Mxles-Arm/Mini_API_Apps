@@ -32,5 +32,9 @@ export const IMAGE_SIZES = {
   profile: {
     small: `${TMDB_IMAGE_BASE}/w45`,
     medium: `${TMDB_IMAGE_BASE}/w185`,
+    large: `${TMDB_IMAGE_BASE}/h632`,
+  },
+  logo: {
+    small: `${TMDB_IMAGE_BASE}/w92`,
   },
 };

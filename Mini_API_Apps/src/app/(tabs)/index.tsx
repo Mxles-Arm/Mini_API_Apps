@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeContext } from '@/context/ThemeContext';
+import { tapFeedback } from '@/services/haptics';
 import { Movie, getTrending, getNowPlaying, getTopRated, getUpcoming, getPopular } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
 import Banner from '@/components/Banner';
@@ -131,7 +132,10 @@ export default function HomeScreen() {
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{'Tonight’s shortlist'}</Text>
           </View>
           <Pressable
-            onPress={toggleTheme}
+            onPress={() => {
+              tapFeedback();
+              toggleTheme();
+            }}
             style={styles.themeButton}
             accessibilityRole="button"
             accessibilityLabel={isDark ? 'Switch to light theme' : 'Switch to dark theme'}

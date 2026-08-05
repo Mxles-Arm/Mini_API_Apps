@@ -44,6 +44,16 @@ function RootStack() {
             animation: 'slide_from_right',
           }}
         />
+        <Stack.Screen
+          name="person/[id]"
+          options={{
+            headerShown: true,
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.text,
+            headerTitleStyle: { fontWeight: '700' },
+            animation: 'slide_from_right',
+          }}
+        />
       </Stack>
     </>
   );

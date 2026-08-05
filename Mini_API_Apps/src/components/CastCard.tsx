@@ -3,8 +3,9 @@
 // ==========================================
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { CastMember } from '@/services/tmdb';
 import { IMAGE_SIZES } from '@/constants/config';
 import { useThemeContext } from '@/context/ThemeContext';
@@ -15,13 +16,19 @@ interface CastCardProps {
 
 export default function CastCard({ cast }: CastCardProps) {
   const { colors } = useThemeContext();
+  const router = useRouter();
 
   const profileUri = cast.profile_path
     ? `${IMAGE_SIZES.profile.medium}${cast.profile_path}`
     : null;
 
   return (
-    <View style={styles.container}>
+    <Pressable
+      style={({ pressed }) => [styles.container, pressed && styles.pressed]}
+      onPress={() => router.push(`/person/${cast.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={`${cast.name}, view filmography`}
+    >
       <View style={[styles.imageContainer, { backgroundColor: colors.surfaceLight }]}>
         {profileUri ? (
           <Image source={{ uri: profileUri }} style={styles.image} contentFit="cover" transition={300} />
@@ -37,7 +44,7 @@ export default function CastCard({ cast }: CastCardProps) {
       <Text style={[styles.character, { color: colors.textSecondary }]} numberOfLines={1}>
         {cast.character}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -46,6 +53,9 @@ const styles = StyleSheet.create({
     width: 80,
     marginRight: 14,
     alignItems: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
   },
   imageContainer: {
     width: 70,
